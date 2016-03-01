@@ -49,6 +49,38 @@ func Start(client *docker.Client, container *docker.Container, hostConfig *docke
 	return <-attachChan
 }
 
+func StartBindExec(client *docker.Client, exec *docker.Exec, stdout *os.File, stderr *os.File, stdin *os.File) (err error) {
+	var (
+		terminalFd uintptr
+		oldState   *term.State
+		out        io.Writer = os.Stdout
+	)
+
+	if file, ok := out.(*os.File); ok {
+		terminalFd = file.Fd()
+	} else {
+		return errors.New("Not a terminal!")
+	}
+
+	// Set up the pseudo terminal
+	oldState, err = term.SetRawTerminal(terminalFd)
+	if err != nil {
+		return
+	}
+
+	// Clean up after the exec command has exited
+	defer term.RestoreTerminal(terminalFd, oldState)
+
+	// Start it
+	errorChan := make(chan error)
+	go startbindExec(client, exec, errorChan, stdout, stderr, stdin)
+
+	// Make sure terminal resizes are passed on to the exec Tty
+	monitorExecTty(client, exec.ID, terminalFd)
+
+	return <-errorChan
+}
+
 func StartExec(client *docker.Client, exec *docker.Exec) (err error) {
 	var (
 		terminalFd uintptr
@@ -93,6 +125,18 @@ func attachToContainer(client *docker.Client, containerID string, errorChan chan
 		Stdout:       true,
 		Stderr:       true,
 		Stream:       true,
+		RawTerminal:  true,
+	})
+	errorChan <- err
+}
+
+func startBindExec(client *docker.Client, exec *docker.Exec, errorChan chan error, stdout *os.File, stderr *os.File, stdin *os.File) {
+	err := client.StartExec(exec.ID, docker.StartExecOptions{
+		Detach:       false,
+		Tty:          true,
+		InputStream:  stdin,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
 		RawTerminal:  true,
 	})
 	errorChan <- err
