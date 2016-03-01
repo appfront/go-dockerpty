@@ -49,7 +49,7 @@ func Start(client *docker.Client, container *docker.Container, hostConfig *docke
 	return <-attachChan
 }
 
-func StartBindExec(client *docker.Client, exec *docker.Exec, stdout *os.File, stderr *os.File, stdin *os.File) (err error) {
+func StartBindExec(client *docker.Client, exec *docker.Exec, stdout io.Writer, stderr io.Writer, stdin io.Reader) (err error) {
 	var (
 		terminalFd uintptr
 		oldState   *term.State
@@ -130,7 +130,7 @@ func attachToContainer(client *docker.Client, containerID string, errorChan chan
 	errorChan <- err
 }
 
-func startbindExec(client *docker.Client, exec *docker.Exec, errorChan chan error, stdout *os.File, stderr *os.File, stdin *os.File) {
+func startbindExec(client *docker.Client, exec *docker.Exec, errorChan chan error, stdout io.Writer, stderr io.Writer, stdin io.Reader) {
 	err := client.StartExec(exec.ID, docker.StartExecOptions{
 		Detach:       false,
 		Tty:          true,

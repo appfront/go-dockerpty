@@ -138,3 +138,8 @@ container's PTY until the container exits, or the container's PTY is closed.
 
 This is a safe operation and all resources should be restored back to their original
 states.
+
+
+in             io.Reader
+	stdout         io.Writer
+	stderr         io.Writer
